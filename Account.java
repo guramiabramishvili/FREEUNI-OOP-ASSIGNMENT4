@@ -1,5 +1,5 @@
 // Account.java
-
+import java.util.*;
 /*
  Simple, thread-safe Account class encapsulates
  a balance and a transaction count.
@@ -19,6 +19,15 @@ public class Account {
 		this.id = id;
 		this.balance = balance;
 		transactions = 0;
+	}
+
+	public synchronized void makeTransaction(Transaction tr) {
+		transactions++;
+		balance += tr.amount;
+	}
+
+	public String toString(){
+		return "acct:" + id + " bal:" + balance + " trans:" + transactions;
 	}
 	
 }

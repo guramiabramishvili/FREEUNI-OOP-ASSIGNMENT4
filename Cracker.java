@@ -4,6 +4,8 @@
 */
 
 import java.security.*;
+import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
 
 public class Cracker {
 	// Array of chars used to produce strings
@@ -39,24 +41,107 @@ public class Cracker {
 		}
 		return result;
 	}
-	
-	
-	
+
+	public static String stringToHash(String str) throws NoSuchAlgorithmException {
+		String res;
+		MessageDigest md = MessageDigest.getInstance("SHA");
+		md.update(str.getBytes());
+		res = hexToString(md.digest());
+		return res;
+	}
+	private static String result;
+
 	public static void main(String[] args) {
-		if (args.length < 2) {
+		if (args.length < 1 ) {
+			System.out.println("Args: target length [workers]");
+			System.exit(1);
+		}else if(args.length == 1){
+			try {
+				System.out.println(stringToHash(args[0]));
+			} catch (NoSuchAlgorithmException e) {
+				e.printStackTrace();
+			}
+			return;
+		}else if(args.length != 3){
 			System.out.println("Args: target length [workers]");
 			System.exit(1);
 		}
 		// args: targ len [num]
 		String targ = args[0];
 		int len = Integer.parseInt(args[1]);
-		int num = 1;
-		if (args.length>2) {
-			num = Integer.parseInt(args[2]);
-		}
-		// a! 34800e15707fae815d7c90d49de44aca97e2d759
-		// xyz 66b27417d37e024c46526c2f6d358a754fc552f3
-		
-		// YOUR CODE HERE
+		int	numThreads = Integer.parseInt(args[2]);
+
+		Cracker cracker = new Cracker();
+		cracker.crackingMode(targ,numThreads,len);
+		System.out.println(result);
 	}
+
+	private void crackingMode(String hash, int numThreads, int wordLength){
+		CountDownLatch latch = new CountDownLatch(1);
+		ArrayList<Worker> threads = new ArrayList<Worker>();
+
+		for(int i=0; i<numThreads; i++){
+			int numChars = CHARS.length/numThreads;
+			threads.add(new Worker(i*numChars,(i+1)*numChars,wordLength,hash,latch));
+		}
+
+		for(Thread thread: threads) {
+			thread.start();
+		}
+
+		try {
+			latch.await();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		for(Thread thread: threads){
+			thread.interrupt();
+		}
+
+	}
+
+	class Worker extends Thread{
+		private final int from;
+		private final int to;
+		private final int length;
+		private final String hash;
+		private final CountDownLatch latch;
+
+		public Worker(int from, int to, int length, String hash, CountDownLatch latch){
+			this.to = to;
+			this.from = from;
+			this.length = length;
+			this.hash = hash;
+			this.latch = latch;
+		}
+		private void crackHash(int maxLength, String word) {
+			if(word.length() > maxLength) return;
+
+			try {
+				if (stringToHash(word).equals(hash)) {
+					result = word;
+					latch.countDown();
+				}
+			} catch (NoSuchAlgorithmException e) {
+				e.printStackTrace();
+			}
+			for (char c : CHARS) {
+				if (isInterrupted()){
+					return;
+				}
+				crackHash(maxLength, word + c);
+			}
+		}
+
+		@Override
+		public void run() {
+			for(int i = from; i < to; i++) {
+				crackHash(length, "" + CHARS[i]);
+			}
+		}
+
+
+	}
+
 }
